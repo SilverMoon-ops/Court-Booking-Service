@@ -9,7 +9,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.11"
 strict = true
 plugins = []
-files = ["app", "tests"]
+files = ["app", "tests", "migrations"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
