@@ -1,4 +1,6 @@
-# Court Booking Service
+# DESIGN.md: Court Booking Service
+
+Status: draft for week-1 review. Nothing is built yet.
 
 ## 1. Problem and goals
 
@@ -63,7 +65,9 @@ ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
 
 Two live rows for the same court cannot overlap in time. The database rejects the second insert even if 100 requests race. Ranges are half-open (`[)`), so a 10:00-11:00 booking and an 11:00-12:00 booking do not conflict.
 
-Other constraints: `end_at > start_at`, `start_at` and `end_at` aligned to the hour, duration between 1 and 3 hours, `price >= 0`, `refund_amount` between 0 and `price`.
+Other database checks: duration is exactly 1, 2 or 3 hours, `price >= 0`, `refund_amount` between 0 and `price`, status is one of the four known values, and a `held` row must have an expiry.
+
+**Hour alignment is not a database check.** Alignment is judged in the venue's local time, and some local timezones are not whole hours from UTC (India is UTC+5:30, so 10:00 local is 04:30 UTC). A UTC-based check would reject valid bookings. The application validates alignment in venue-local time instead (`app/policies.py`), and the database enforces only the duration.
 
 ## 5. Behaviour decisions
 
@@ -73,7 +77,8 @@ The brief is silent or ambiguous in places. These are my decisions; section 8 li
 
 - Booking granularity is whole hours. A booking is 1 to 3 consecutive hours on one court, within one day, inside the venue's opening hours.
 - Hours are aligned in the **venue's local timezone**. API inputs are ISO 8601 with an offset and are converted to UTC.
-- Bookings in the past are rejected.
+- A booking must start in the future. A booking that starts exactly now is also rejected.
+- Alignment to the hour is checked in the venue's local time, not UTC (see section 4).
 
 ### 5.2 Hold, then confirm
 
@@ -165,6 +170,7 @@ No real authentication. Members identify with an `X-Member-Id` header and staff 
 - Every endpoint runs in exactly one transaction. Any exception rolls everything back.
 - The system has no side effects inside a transaction (no payment calls, no emails), so a rollback leaves nothing behind. If side effects are added later, they must use an outbox table written in the same transaction.
 - Constraint violations are caught at the service layer and translated to 409. They are never swallowed halfway through a multi-row operation.
+- When two inserts collide, Postgres reports either an exclusion violation or, occasionally, a deadlock error for the loser. Both mean the slot was taken, so both are mapped to 409. Neither can ever result in two bookings.
 - Isolation level stays at Postgres default (READ COMMITTED). Correctness comes from constraints and row locks, not from relying on a stronger isolation level.
 
 ## 8. Open questions for the client
@@ -214,6 +220,8 @@ Tests run against real Postgres (the same Docker image as production), because S
 
 ## 11. Known risks (preview of LIMITATIONS.md)
 
+- The exclusion constraint exists only in migration 0003 and is not declared on the SQLAlchemy model, because SQLAlchemy's `ExcludeConstraint` has no type hints and the project requires strict mypy with no suppressions. The tests prove it is present.
+- A weekly series that lands on a local time skipped by daylight saving is refused as a whole. A local time that happens twice uses its first occurrence.
 - A single app server clock decides expiry. With several app servers, clock skew could shift expiry by a small amount.
 - No authentication, so identity headers can be forged.
 - Refunds are only recorded.

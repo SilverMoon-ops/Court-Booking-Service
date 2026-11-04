@@ -142,6 +142,10 @@ class Booking(Base):
             "status <> 'held' OR hold_expires_at IS NOT NULL",
             name="held_has_expiry",
         ),
+        # The rule against overlapping bookings is the exclusion constraint
+        # ex_bookings_no_overlap. It is created in migration 0003 and is not
+        # declared here because SQLAlchemy's ExcludeConstraint has no type hints,
+        # which strict mypy rejects.
         Index("ix_bookings_member_status_start", "member_id", "status", "start_at"),
     )
 
