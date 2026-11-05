@@ -6,11 +6,15 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.db import engine
+from app.clock import get_clock
+from app.db import engine, get_session
+from app.main import app
 from app.models import Booking, Court, Member, Venue
+from tests.helpers import START_OF_TIME, FixedClock
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 CONCURRENT_REQUESTS = 50
@@ -81,3 +85,25 @@ def committed_court(migrated_db: None) -> Iterator[CommittedCourt]:
         db.execute(delete(Venue).where(Venue.id == venue_id))
         db.execute(delete(Member).where(Member.id.in_(data.member_ids)))
         db.commit()
+
+
+@pytest.fixture
+def clock() -> FixedClock:
+    return FixedClock(START_OF_TIME)
+
+
+@pytest.fixture
+def client(session: Session, clock: FixedClock) -> Iterator[TestClient]:
+    """The real app, but using the rolled-back test session and a controllable clock."""
+
+    def override_session() -> Iterator[Session]:
+        try:
+            yield session
+        finally:
+            # Like closing a real session: undo anything a failed request left uncommitted.
+            session.rollback()
+
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_clock] = lambda: clock
+    yield TestClient(app)
+    app.dependency_overrides.clear()
