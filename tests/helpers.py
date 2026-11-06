@@ -1,6 +1,14 @@
+import threading
 import uuid
+from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Any
+
+from fastapi.testclient import TestClient
+from httpx import Response
+
+from app.main import app
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -46,3 +54,22 @@ def future_body(court_id: uuid.UUID, days_ahead: int, hour: int, hours: int = 1)
         "start_at": start.isoformat(),
         "end_at": (start + timedelta(hours=hours)).isoformat(),
     }
+
+
+def fire_together(
+    requests: Sequence[tuple[uuid.UUID, str, dict[str, Any] | None]],
+) -> list[Response]:
+    """Send every (member, path, body) POST request at the same instant.
+
+    Each request has its own thread, HTTP client and database connection.
+    """
+    gate = threading.Barrier(len(requests))
+
+    def call(item: tuple[uuid.UUID, str, dict[str, Any] | None]) -> Response:
+        member_id, path, body = item
+        client = TestClient(app)
+        gate.wait()
+        return client.post(path, json=body, headers={"X-Member-Id": str(member_id)})
+
+    with ThreadPoolExecutor(max_workers=len(requests)) as pool:
+        return list(pool.map(call, requests))

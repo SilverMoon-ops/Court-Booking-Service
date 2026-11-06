@@ -4,35 +4,16 @@ Each request runs on its own thread with its own HTTP client and database
 connection, and all of them are released at the same instant.
 """
 
-import threading
 import uuid
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
-from typing import Any
 
-from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import func, select
 
 from app.db import SessionLocal
-from app.main import app
 from app.models import Booking
 from tests.conftest import CommittedCourt
-from tests.helpers import future_body
-
-
-def fire_together(requests: list[tuple[uuid.UUID, dict[str, Any]]]) -> list[Response]:
-    """Send every (member, body) request to POST /holds at the same instant."""
-    gate = threading.Barrier(len(requests))
-
-    def call(item: tuple[uuid.UUID, dict[str, Any]]) -> Response:
-        member_id, body = item
-        client = TestClient(app)
-        gate.wait()
-        return client.post("/holds", json=body, headers={"X-Member-Id": str(member_id)})
-
-    with ThreadPoolExecutor(max_workers=len(requests)) as pool:
-        return list(pool.map(call, requests))
+from tests.helpers import fire_together, future_body
 
 
 def error_codes(responses: list[Response]) -> Counter[str]:
@@ -51,7 +32,9 @@ def test_twenty_members_race_for_one_slot_and_exactly_one_wins(
     committed_court: CommittedCourt,
 ) -> None:
     body = future_body(committed_court.court_id, days_ahead=3, hour=10)
-    responses = fire_together([(member, body) for member in committed_court.member_ids[:20]])
+    responses = fire_together(
+        [(member, "/holds", body) for member in committed_court.member_ids[:20]]
+    )
 
     statuses = Counter(r.status_code for r in responses)
     assert statuses == {201: 1, 409: 19}, statuses
@@ -65,7 +48,7 @@ def test_one_member_cannot_exceed_three_bookings_by_sending_requests_in_parallel
     member = committed_court.member_ids[0]
     # Six different days, so the slots never conflict: only the limit can refuse them.
     requests = [
-        (member, future_body(committed_court.court_id, days_ahead=3 + day, hour=10))
+        (member, "/holds", future_body(committed_court.court_id, days_ahead=3 + day, hour=10))
         for day in range(6)
     ]
     responses = fire_together(requests)
@@ -81,7 +64,7 @@ def test_ten_parallel_retries_of_the_same_hold_make_one_hold(
 ) -> None:
     member = committed_court.member_ids[0]
     body = future_body(committed_court.court_id, days_ahead=3, hour=10)
-    responses = fire_together([(member, body)] * 10)
+    responses = fire_together([(member, "/holds", body)] * 10)
 
     statuses = Counter(r.status_code for r in responses)
     assert statuses == {201: 1, 200: 9}, statuses

@@ -28,3 +28,13 @@ class SlotUnavailable(AppError):
 class BookingLimitReached(AppError):
     status_code = 409
     code = "booking_limit_reached"
+
+
+class HoldExpired(AppError):
+    status_code = 410
+    code = "hold_expired"
+
+
+class InvalidState(AppError):
+    status_code = 409
+    code = "invalid_state"

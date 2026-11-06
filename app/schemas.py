@@ -25,3 +25,12 @@ class BookingOut(BaseModel):
     hold_expires_at: datetime | None
     confirmed_at: datetime | None
     cancelled_at: datetime | None
+
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
