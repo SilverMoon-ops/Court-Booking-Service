@@ -1,3 +1,4 @@
+import datetime as dt
 import uuid
 from datetime import datetime
 
@@ -34,3 +35,21 @@ class ErrorDetail(BaseModel):
 
 class ErrorResponse(BaseModel):
     error: ErrorDetail
+
+
+class SlotOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    start_at: datetime  # venue-local time, with its offset
+    end_at: datetime
+    status: str  # "free" or "unavailable"
+    price: int  # minor units (paise)
+
+
+class AvailabilityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    court_id: uuid.UUID
+    date: dt.date  # the venue-local day
+    timezone: str
+    slots: list[SlotOut]

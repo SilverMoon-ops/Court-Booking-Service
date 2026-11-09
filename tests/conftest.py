@@ -97,10 +97,13 @@ def client(session: Session, clock: FixedClock) -> Iterator[TestClient]:
     """The real app, but using the rolled-back test session and a controllable clock."""
 
     def override_session() -> Iterator[Session]:
+        # Whatever the test (or an earlier request) saved before this request is already
+        # in the database in real life, so commit it. Only THIS request's work is at risk.
+        session.commit()
         try:
             yield session
         finally:
-            # Like closing a real session: undo anything a failed request left uncommitted.
+            # Like closing a real session: undo what a failed request left uncommitted.
             session.rollback()
 
     app.dependency_overrides[get_session] = override_session

@@ -3,11 +3,12 @@ from fastapi.responses import JSONResponse
 
 from app.errors import AppError
 from app.policies import InvalidSlot
-from app.routers import bookings, holds
+from app.routers import bookings, courts, holds
 
 app = FastAPI(title="Court Booking Service")
 app.include_router(holds.router)
 app.include_router(bookings.router)
+app.include_router(courts.router)
 
 
 def error_body(code: str, message: str) -> dict[str, dict[str, str]]:

@@ -129,9 +129,35 @@ def weekly_occurrences(
     starts: list[datetime] = []
     for week in range(count):
         day = first_date + timedelta(weeks=week)
-        wanted = datetime(day.year, day.month, day.day, start_hour, tzinfo=venue.tz)
-        instant = wanted.astimezone(UTC)
-        if instant.astimezone(venue.tz).replace(tzinfo=None) != wanted.replace(tzinfo=None):
+        instant = _local_hour_to_utc(venue, day, start_hour)
+        if instant is None:
             raise InvalidSlot(f"{day} {start_hour:02d}:00 does not exist in {venue.timezone}")
         starts.append(instant)
     return starts
+
+
+def _local_hour_to_utc(venue: VenueRules, day: date, hour: int) -> datetime | None:
+    """The UTC instant of `hour`:00 on `day` in the venue's timezone.
+
+    Returns None if that local time does not exist (the hour skipped when the clocks
+    go forward). A local time that happens twice (clocks go back) is the first one.
+    """
+    wanted = datetime(day.year, day.month, day.day, hour, tzinfo=venue.tz)
+    instant = wanted.astimezone(UTC)
+    if instant.astimezone(venue.tz).replace(tzinfo=None) != wanted.replace(tzinfo=None):
+        return None
+    return instant
+
+
+def day_slots(venue: VenueRules, day: date) -> list[tuple[datetime, datetime]]:
+    """The hourly slots of one venue-local day, as (start, end) in UTC.
+
+    Covers opening hours only. An hour that does not exist on that day because of a
+    daylight-saving change is left out.
+    """
+    slots: list[tuple[datetime, datetime]] = []
+    for hour in range(venue.open_hour, venue.close_hour):
+        start = _local_hour_to_utc(venue, day, hour)
+        if start is not None:
+            slots.append((start, start + HOUR))
+    return slots
