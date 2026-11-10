@@ -73,3 +73,17 @@ def fire_together(
 
     with ThreadPoolExecutor(max_workers=len(requests)) as pool:
         return list(pool.map(call, requests))
+
+
+def recurring_body(
+    court_id: uuid.UUID, day: int, hour: int, hours: int = 1, occurrences: int = 4
+) -> dict[str, Any]:
+    """A weekly series whose first booking is on `day` (see slot_start), in Indian time."""
+    return {**hold_body(court_id, day, hour, hours), "occurrences": occurrences}
+
+
+def future_recurring_body(
+    court_id: uuid.UUID, days_ahead: int, hour: int, hours: int = 1, occurrences: int = 4
+) -> dict[str, Any]:
+    """Like recurring_body, but relative to the real clock."""
+    return {**future_body(court_id, days_ahead, hour, hours), "occurrences": occurrences}

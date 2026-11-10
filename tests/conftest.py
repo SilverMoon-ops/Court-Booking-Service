@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.clock import get_clock
 from app.db import engine, get_session
 from app.main import app
-from app.models import Booking, Court, Member, Venue
+from app.models import Booking, Court, Member, RecurringSeries, Venue
 from tests.helpers import START_OF_TIME, FixedClock
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
@@ -81,6 +81,7 @@ def committed_court(migrated_db: None) -> Iterator[CommittedCourt]:
 
     with Session(engine) as db:
         db.execute(delete(Booking).where(Booking.court_id == data.court_id))
+        db.execute(delete(RecurringSeries).where(RecurringSeries.court_id == data.court_id))
         db.execute(delete(Court).where(Court.id == data.court_id))
         db.execute(delete(Venue).where(Venue.id == venue_id))
         db.execute(delete(Member).where(Member.id.in_(data.member_ids)))

@@ -1,15 +1,14 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from psycopg.errors import DeadlockDetected, ExclusionViolation
 from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.clock import Clock
-from app.errors import BookingLimitReached, HoldExpired, InvalidState, NotFound, SlotUnavailable
+from app.errors import BookingLimitReached, HoldExpired, InvalidState, NotFound
 from app.models import Booking, BookingStatus
 from app.policies import can_add_bookings, price_for, validate_slot
+from app.services.conflicts import flush_or_slot_unavailable
 from app.services.limits import active_booking_count, lock_member
 from app.services.venues import load_venue_rules
 
@@ -80,19 +79,8 @@ def create_hold(
         price=price_for(rules, start, end),
         hold_expires_at=now + ttl,
     )
-    try:
-        db.add(hold)
-        db.flush()
-    except IntegrityError as exc:
-        if isinstance(exc.orig, ExclusionViolation):
-            raise SlotUnavailable("that court is already booked at that time") from exc
-        raise
-    except OperationalError as exc:
-        # When two inserts collide Postgres may stop one with a deadlock error
-        # instead of an exclusion error. Either way the slot was taken.
-        if isinstance(exc.orig, DeadlockDetected):
-            raise SlotUnavailable("that court is already booked at that time") from exc
-        raise
+    db.add(hold)
+    flush_or_slot_unavailable(db, "that court is already booked at that time")
 
     db.commit()
     return hold, True
