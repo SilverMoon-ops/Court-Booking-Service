@@ -6,6 +6,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://club:club@localhost:5432/court_booking"
     hold_ttl_minutes: int = 10
+    # Shared secret for staff endpoints. Empty means staff access is switched off.
+    staff_api_key: str = ""
 
 
 @lru_cache

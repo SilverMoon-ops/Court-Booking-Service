@@ -16,6 +16,10 @@ def load_venue_rules(db: Session, court_id: uuid.UUID) -> VenueRules:
     venue = db.get(Venue, court.venue_id)
     if venue is None:  # cannot happen: courts.venue_id is a foreign key
         raise NotFound("venue not found")
+    return rules_for_venue(db, venue)
+
+
+def rules_for_venue(db: Session, venue: Venue) -> VenueRules:
     windows = db.scalars(select(PeakWindow).where(PeakWindow.venue_id == venue.id)).all()
     return VenueRules(
         timezone=venue.timezone,

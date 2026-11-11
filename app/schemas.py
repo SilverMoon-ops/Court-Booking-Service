@@ -75,3 +75,29 @@ class SeriesOut(BaseModel):
     first_date: dt.date  # venue-local
     occurrences: int
     bookings: list[BookingOut]
+
+
+class CourtUtilization(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    court_id: uuid.UUID
+    court_name: str
+    open_hours: int  # hours the court was open that week
+    booked_hours: float  # hours covered by confirmed bookings
+    utilization: float  # booked_hours / open_hours, between 0 and 1
+
+
+class VenueUtilization(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    venue_id: uuid.UUID
+    venue_name: str
+    timezone: str
+    week: str  # e.g. 2030-W02
+    week_start: dt.date  # Monday, venue-local
+    week_end: dt.date  # Sunday, venue-local
+    courts: list[CourtUtilization]
+
+
+class UtilizationOut(BaseModel):
+    venues: list[VenueUtilization]

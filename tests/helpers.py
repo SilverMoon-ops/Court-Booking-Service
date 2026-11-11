@@ -87,3 +87,6 @@ def future_recurring_body(
 ) -> dict[str, Any]:
     """Like recurring_body, but relative to the real clock."""
     return {**future_body(court_id, days_ahead, hour, hours), "occurrences": occurrences}
+
+
+STAFF_HEADERS = {"X-Staff-Key": "test-staff-key"}  # tests/__init__.py sets STAFF_API_KEY to this

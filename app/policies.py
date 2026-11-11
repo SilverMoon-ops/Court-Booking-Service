@@ -6,6 +6,7 @@ always timezone-aware. Opening hours and peak windows are in the venue's local
 time, so they are converted from UTC before they are compared.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -20,6 +21,10 @@ HOUR = timedelta(hours=1)
 
 class InvalidSlot(ValueError):
     """The requested time cannot be booked. The message says why."""
+
+
+class InvalidWeek(ValueError):
+    """The week is not a valid ISO week such as 2030-W02."""
 
 
 @dataclass(frozen=True)
@@ -161,3 +166,39 @@ def day_slots(venue: VenueRules, day: date) -> list[tuple[datetime, datetime]]:
         if start is not None:
             slots.append((start, start + HOUR))
     return slots
+
+
+_ISO_WEEK = re.compile(r"^(\d{4})-W(\d{2})$")
+
+
+def parse_iso_week(text: str) -> date:
+    """The Monday of an ISO week written like 2030-W02. Weeks run Monday to Sunday."""
+    match = _ISO_WEEK.match(text)
+    if match is None:
+        raise InvalidWeek("write the week like 2030-W02")
+    try:
+        return date.fromisocalendar(int(match[1]), int(match[2]), 1)
+    except ValueError:
+        raise InvalidWeek(f"{text} is not a week that exists") from None
+
+
+def monday_of(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def iso_week_label(monday: date) -> str:
+    year, week, _ = monday.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def week_window(venue: VenueRules, monday: date) -> tuple[datetime, datetime]:
+    """Start and end (UTC) of a week at this venue: local midnight Monday to the next one.
+
+    The week follows the venue's own midnight, not UTC midnight, so a booking at 00:30
+    Monday venue time belongs to the new week even though it is still Sunday in UTC.
+    """
+
+    def local_midnight(day: date) -> datetime:
+        return datetime(day.year, day.month, day.day, tzinfo=venue.tz).astimezone(UTC)
+
+    return local_midnight(monday), local_midnight(monday + timedelta(days=7))

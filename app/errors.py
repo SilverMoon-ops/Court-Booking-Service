@@ -38,3 +38,18 @@ class HoldExpired(AppError):
 class InvalidState(AppError):
     status_code = 409
     code = "invalid_state"
+
+
+class StaffRequired(AppError):
+    status_code = 401
+    code = "staff_required"
+
+
+class Forbidden(AppError):
+    status_code = 403
+    code = "forbidden"
+
+
+class StaffNotConfigured(AppError):
+    status_code = 503
+    code = "staff_not_configured"

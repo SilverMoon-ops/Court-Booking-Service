@@ -50,6 +50,7 @@ def _recreate(url: URL) -> None:
         admin.dispose()
 
 
+os.environ.setdefault("STAFF_API_KEY", "test-staff-key")  # staff endpoints need a key
 _url = _test_database_url()
 _recreate(_url)
 os.environ["DATABASE_URL"] = _url.render_as_string(hide_password=False)
