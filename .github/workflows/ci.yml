@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: Lint, types and tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: club
+          POSTGRES_PASSWORD: club
+          POSTGRES_DB: court_booking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U club -d court_booking"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The tests derive their own throwaway database (court_booking_test) from this.
+      DATABASE_URL: postgresql+psycopg://club:club@localhost:5432/court_booking
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Lint
+        run: ruff check .
+      - name: Format check
+        run: ruff format --check .
+      - name: Type check
+        run: mypy
+      - name: Tests
+        run: pytest -q
+
+  docker:
+    name: docker compose up
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the environment file
+        run: cp .env.example .env
+      - name: Build and start the whole stack
+        run: docker compose up -d --build
+      - name: Wait for the API and check it answers
+        run: curl --fail --retry 30 --retry-delay 2 --retry-connrefused http://localhost:8000/health
+      - name: Show logs if something failed
+        if: failure()
+        run: docker compose logs
+      - name: Stop
+        if: always()
+        run: docker compose down -v

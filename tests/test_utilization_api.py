@@ -187,9 +187,13 @@ def test_several_venues_can_be_listed_or_filtered(
 ) -> None:
     court, _, _ = world
     second = Venue(
-        name="Zed Club", timezone="America/New_York", open_hour=8, close_hour=20,
-        offpeak_rate=1, peak_rate=2,
-    )  # fmt: skip
+        name="Zed Club",
+        timezone="America/New_York",
+        open_hour=8,
+        close_hour=20,
+        offpeak_rate=1,
+        peak_rate=2,
+    )
     session.add(second)
     session.flush()
     session.add(Court(venue_id=second.id, name="Court A"))
@@ -211,9 +215,13 @@ def test_several_venues_can_be_listed_or_filtered(
 
 def make_all_day_venue(session: Session) -> tuple[Court, Member]:
     venue = Venue(
-        name="All Day", timezone="Asia/Kolkata", open_hour=0, close_hour=24,
-        offpeak_rate=1, peak_rate=2,
-    )  # fmt: skip
+        name="All Day",
+        timezone="Asia/Kolkata",
+        open_hour=0,
+        close_hour=24,
+        offpeak_rate=1,
+        peak_rate=2,
+    )
     session.add(venue)
     session.flush()
     court, member = Court(venue_id=venue.id, name="Court 1"), Member(name="Night owl")
@@ -224,9 +232,13 @@ def make_all_day_venue(session: Session) -> tuple[Court, Member]:
 
 def confirmed_row(court: Court, member: Member, start: datetime) -> Booking:
     return Booking(
-        member_id=member.id, court_id=court.id, start_at=start, end_at=start + timedelta(hours=1),
-        status=BookingStatus.CONFIRMED, price=1,
-    )  # fmt: skip
+        member_id=member.id,
+        court_id=court.id,
+        start_at=start,
+        end_at=start + timedelta(hours=1),
+        status=BookingStatus.CONFIRMED,
+        price=1,
+    )
 
 
 def test_the_week_changes_at_the_venues_midnight_not_utc_midnight(
@@ -252,9 +264,13 @@ def test_a_daylight_saving_week_has_an_hour_fewer_open_hours(
     client: TestClient, session: Session
 ) -> None:
     venue = Venue(
-        name="Open Always", timezone="America/New_York", open_hour=0, close_hour=24,
-        offpeak_rate=1, peak_rate=2,
-    )  # fmt: skip
+        name="Open Always",
+        timezone="America/New_York",
+        open_hour=0,
+        close_hour=24,
+        offpeak_rate=1,
+        peak_rate=2,
+    )
     session.add(venue)
     session.flush()
     session.add(Court(venue_id=venue.id, name="Court 1"))
@@ -269,9 +285,13 @@ def test_without_a_week_each_venue_reports_its_own_current_week(
     client: TestClient, session: Session, world: tuple[Court, Member, Member], clock: FixedClock
 ) -> None:
     ny = Venue(
-        name="Zed Club", timezone="America/New_York", open_hour=8, close_hour=20,
-        offpeak_rate=1, peak_rate=2,
-    )  # fmt: skip
+        name="Zed Club",
+        timezone="America/New_York",
+        open_hour=8,
+        close_hour=20,
+        offpeak_rate=1,
+        peak_rate=2,
+    )
     session.add(ny)
     session.flush()
     session.add(Court(venue_id=ny.id, name="Court A"))

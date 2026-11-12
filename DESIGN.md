@@ -226,3 +226,68 @@ Tests run against real Postgres (the same Docker image as production), because S
 - No authentication, so identity headers can be forged.
 - Refunds are only recorded.
 - The service does not itself prevent a member abusing many accounts.
+
+## 12. Plan
+
+- Week 1: this document, reviewed.
+- Weeks 2-3: Docker and Alembic baseline, models and the constraint, availability, hold, confirm, cancel, recurring, pricing, limit, utilization, guarantee tests, ruff, mypy, CI, README.
+- Week 4: absorb the mid-month requirement change (policy code is isolated to keep this cheap), write LIMITATIONS.md, prepare the live walkthrough.
+
+## 13. As built: what changed since this design was approved
+
+This section records where the finished system differs from, or adds detail to, the design above.
+
+**Holds, confirm and cancel**
+
+- A repeated `POST /holds` for the identical slot returns the existing hold with `200` instead of `201`.
+- Confirm is one guarded `UPDATE` (still `held`, unexpired, not yet started, owned by the caller). If it changes nothing, a read decides: already confirmed returns the same booking, expired or already-started returns `410`, cancelled returns `409`, not found or not yours returns `404`.
+- Cancel locks the row (`SELECT ... FOR UPDATE`) and then decides. A retry returns the **stored** result and never recalculates the refund, because the 24-hour window may have closed in the meantime. Cancelling a booking that has already started returns `409`; an expired hold returns `410`. Cancelling an unconfirmed hold records a refund of `0`.
+- Cancel and confirm can race on the same hold. Both orders end consistently: confirmed then cancelled with a full refund, or cancelled first and the confirm refused.
+
+**Availability**
+
+- `GET /courts/{id}/availability?date=` needs no member header, because browsing is open. Slots are shown in the venue's local time. Hours that have already started are `unavailable`. The response never says who holds a slot. A test checks that availability agrees with what `POST /holds` actually does for every hour.
+
+**Recurring bookings**
+
+- `POST /recurring-bookings` takes the first booking plus `occurrences` (1 to 12). All weeks are validated, checked and inserted in one transaction and committed once. If any week is taken the whole request fails with `409`, and the message lists the taken dates.
+- A series counts as **one** of the member's three bookings (answers open question 1).
+- An identical request from the same member returns the existing series (`200`). This is a heuristic based on the request contents, not an idempotency key.
+- A series that lands on a local hour skipped by daylight saving is refused as a whole.
+
+**Staff utilization**
+
+- `GET /staff/utilization?week=2030-W02&venue_id=` returns, per court, `open_hours`, `booked_hours` and `utilization`. Only confirmed bookings count. The week runs Monday to Sunday in the **venue's own timezone**, and open hours account for daylight saving. With no `week`, each venue reports its own current week.
+- Staff access uses a shared key in `X-Staff-Key` and **fails closed**: no configured key means `503`, a missing key `401`, a wrong key `403`. This answers question 8 only in part. Staff cancelling on a member's behalf is still not built.
+
+**Concurrency details found while building**
+
+- When two inserts collide, Postgres reports either an exclusion violation or, occasionally, a deadlock for the loser. Both are mapped to `409` through one helper (`services/conflicts.py`).
+- Every operation that checks the member's limit first locks the member's row, before inserting bookings, so the lock order is the same everywhere.
+
+**Testing**
+
+- Tests build a fresh database named `<database>_test` on every run, so they do not depend on leftover state.
+
+**Status of the open questions**
+
+| #   | Question                                    | Status                                    |
+| --- | ------------------------------------------- | ----------------------------------------- |
+| 1   | Does a series count as one booking or many? | Assumed one; implemented                  |
+| 2   | Do holds count towards the limit?           | Assumed yes; implemented                  |
+| 3   | Are refunds paid out or only recorded?      | Recorded only                             |
+| 4   | Hold duration                               | 10 minutes, configurable                  |
+| 5   | Maximum booking length                      | 3 hours                                   |
+| 6   | Maximum series length                       | 12 weeks                                  |
+| 7   | One week taken: reject all or skip it?      | Reject all                                |
+| 8   | Staff on behalf of members                  | Staff report only; staff cancel not built |
+| 10  | What does utilization mean?                 | Booked hours over opening hours           |
+| 12  | Limit per venue or overall?                 | Overall                                   |
+
+Still open: 9 (public holidays), 11 (a closed court) and 13 (member timezone).
+
+**Alternatives rejected during the build**
+
+- A client-supplied idempotency key table for `POST /holds` and series: not needed because a hold and its booking are one row, and a repeated request is matched by its contents.
+- A background job that expires holds: correctness must not depend on a job being alive. Expired holds are cleared inside the next overlapping request.
+- Declaring the exclusion constraint on the SQLAlchemy model: its `ExcludeConstraint` has no type hints and strict mypy with no suppressions rejects it. The constraint lives in migration `0003`, and tests prove it exists.
