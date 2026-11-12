@@ -8,8 +8,10 @@ is **missing, incomplete or still pending**. Evidence is a test file or a comman
 - All 8 functional requirements, all 3 guarantees and all 4 fixed-contract endpoints are built.
 - 193 automated tests pass. ruff, `ruff format --check` and strict mypy are clean, with **no inline
   suppressions** anywhere in the code.
-- Not finished: the live walkthrough, the mid-month requirement change, confirming the first CI run
-  on GitHub, and several product gaps listed in section 4.
+- CI passes on GitHub (run #2): lint, format, strict mypy and all 193 tests on Python 3.11, and
+  `docker compose up` from a clean checkout.
+- Not finished: the live walkthrough, the mid-month requirement change, and several product gaps
+  listed in section 4.
 
 ## 2. Requirements broken into tasks
 
@@ -50,11 +52,11 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Python 3.11 | **Done, with a caveat** | Docker image and CI use 3.11. I develop on 3.12, so the 3.11 run is only confirmed once CI runs |
+| Python 3.11 | **Done** | Docker image and CI use 3.11, and CI run #2 passed on it. I develop on 3.12 locally |
 | FastAPI, SQLAlchemy 2, Alembic, Postgres 15 | **Done** | 3 migrations; `postgres:15` in `docker-compose.yml` |
 | pytest | **Done** | 193 tests |
 | ruff and mypy clean, no inline suppressions | **Done** | `ruff check`, `ruff format --check` and strict `mypy` all pass; a search for `noqa`, `type: ignore`, `fmt: skip` finds none |
-| Everything runs with `docker compose up` | **Done, to be re-checked** | Worked on my laptop; re-run from a clean clone before the final push |
+| Everything runs with `docker compose up` | **Done** | The CI job `docker compose up` builds and starts the whole stack from a clean checkout and `/health` answers (run #2 passed). Also works on my laptop |
 
 ### Deliverables
 
@@ -63,7 +65,7 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 | DESIGN.md (assumptions, questions for the client, rejected alternatives) | **Done**, updated to match the final system (section 13). Review by the mentor: not confirmed |
 | Own tests proving each guarantee | **Done** |
 | README | **Done** |
-| CI workflow | **Written, first GitHub run not yet confirmed** |
+| CI workflow | **Done**: passing on GitHub (run #2: lint, format, types, 193 tests, and `docker compose up`) |
 | LIMITATIONS.md | **Done** |
 | Live walkthrough where I change something on the spot | **Pending** |
 
@@ -77,6 +79,7 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 | `mypy` (strict) | no issues in 50 files |
 | Search for inline suppressions | **Found 5 `# fmt: skip` comments in `tests/test_utilization_api.py` and removed them**; none remain |
 | Tests use their own throwaway database | They no longer share data with manual testing, which fixed runs that failed once and passed on a rerun |
+| GitHub Actions CI | Run #2 passed both jobs (Python 3.11, Postgres 15). Run #1 failed in the docker job because the readiness check gave up on the first reset connection while the API was still starting (curl exit code 56). I reproduced it and fixed it with `--retry-all-errors` |
 | Manual checks through the API docs and `curl` | hold, retry, conflict, confirm, cancel, recurring, availability, utilization, member limit, staff key |
 | Breaking the code on purpose | For each important rule I removed or changed it and confirmed a test fails. Examples: removing the double-booking constraint (50 bookings), removing the member lock (limit exceeded), saving recurring weeks one by one (partial rows), recomputing the refund on a retry, counting holds in utilization, using UTC weeks |
 
@@ -97,10 +100,8 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 
 | # | Item | What is left |
 |---|---|---|
-| I1 | CI | Workflow written and its steps pass locally; the first run on GitHub is not yet checked |
-| I2 | Python 3.11 | Verified locally on 3.12; CI will confirm 3.11 |
-| I3 | Hold expiry check | Verified by automated tests with a controllable clock; not waited out live for 10 minutes |
-| I4 | DESIGN.md review | Waiting for the mentor's review comments |
+| I1 | Hold expiry check | Verified by automated tests with a controllable clock; not waited out live for 10 minutes |
+| I2 | DESIGN.md review | Waiting for the mentor's review comments |
 
 ### Pending
 
@@ -114,8 +115,7 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 
 ## 5. Next steps, in order
 
-1. Check that the first CI run is green and fix anything it finds.
-2. Agree the contract shapes with the mentor (P1).
-3. Decide with the mentor whether M1 (admin endpoints) is wanted, and build it if so.
-4. Absorb the requirement change when it arrives.
-5. Practise the walkthrough.
+1. Agree the contract shapes with the mentor (P1).
+2. Decide with the mentor whether M1 (admin endpoints) is wanted, and build it if so.
+3. Absorb the requirement change when it arrives.
+4. Practise the walkthrough.
