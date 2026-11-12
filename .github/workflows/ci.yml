@@ -54,7 +54,7 @@ jobs:
       - name: Build and start the whole stack
         run: docker compose up -d --build
       - name: Wait for the API and check it answers
-        run: curl --fail --retry 30 --retry-delay 2 --retry-connrefused http://localhost:8000/health
+        run: curl --fail --retry 30 --retry-delay 2 --retry-connrefused --retry-all-errors --retry-max-time 120 http://localhost:8000/health
       - name: Show logs if something failed
         if: failure()
         run: docker compose logs
