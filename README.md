@@ -15,10 +15,57 @@ docker compose up --build
 
 - API: http://localhost:8000 — interactive docs: http://localhost:8000/docs
 - Migrations run automatically when the API container starts.
-- Demo data (a venue, two courts, two members) and the ids to use:
+- Set everything up through the API with the staff key (see "Setting up a club" below), or load
+  demo data (a venue, two courts, two members) and print its ids:
   ```bash
   docker compose exec api python -m app.seed
   ```
+
+## Setting up a club (staff)
+
+Staff create venues, courts and members, so no SQL is needed. These endpoints need `X-Staff-Key`.
+
+```bash
+S="X-Staff-Key: dev-staff-key"; J="Content-Type: application/json"
+
+# A venue: opening hours, hourly rates in paise, and weekly peak windows (venue-local time)
+curl -X POST localhost:8000/venues -H "$S" -H "$J" -d '{
+  "name": "Riverside", "timezone": "Asia/Kolkata", "open_hour": 6, "close_hour": 22,
+  "offpeak_rate": 20000, "peak_rate": 40000,
+  "peak_windows": [{"weekday": 0, "start_hour": 18, "end_hour": 22}]
+}'                                                    # weekday 0 = Monday
+
+curl -X POST localhost:8000/venues/$VENUE/courts -H "$S" -H "$J" -d '{"name": "Court 1"}'
+curl -X POST localhost:8000/members -H "$S" -H "$J" -d '{"name": "Asha"}'   # returns the member id
+curl localhost:8000/venues -H "$S"                    # every venue with its courts and windows
+curl -X PUT localhost:8000/venues/$VENUE/pricing -H "$S" -H "$J" -d '{
+  "offpeak_rate": 25000, "peak_rate": 45000, "peak_windows": []
+}'                                                    # existing bookings keep their price
+```
+
+## The database as plain SQL
+
+The schema and demo data are also available as ordinary SQL files, so they can be read, reviewed
+and run without Python:
+
+| File | What it is |
+|---|---|
+| `sql/schema.sql` | The whole schema: tables, CHECK and UNIQUE rules, and the double-booking constraint `ex_bookings_no_overlap`. Generated from the Alembic migrations |
+| `sql/seed.sql` | Demo data: one venue, two courts, two members, weekday-evening peak pricing. Safe to run repeatedly |
+| `sql/inspect.sql` | Queries to look at the tables, every rule the database enforces, the bookings in venue-local time, and utilization in plain SQL |
+
+```bash
+# Build an empty database from SQL alone and load the demo data
+docker compose exec -T db psql -U club -d postgres -c "CREATE DATABASE demo"
+docker compose exec -T db psql -U club -d demo < sql/schema.sql
+docker compose exec -T db psql -U club -d demo < sql/seed.sql      # prints the court and member ids
+docker compose exec -T db psql -U club -d demo < sql/inspect.sql   # look around
+```
+
+A database built this way is identical to one built by `alembic upgrade head`, and Alembic can
+carry on from it. Tests enforce this: they fail if `sql/schema.sql` is out of date (regenerate it
+with `python -m app.sqlexport`), if the two databases differ, or if the seed creates duplicates.
+Nothing needs the seed any more, because staff can create the same data through the API.
 
 ## Using the API
 
@@ -56,6 +103,10 @@ curl "localhost:8000/staff/utilization?week=2031-W03" -H "X-Staff-Key: dev-staff
 | `POST /bookings/{id}/cancel` | Cancel a booking or release a hold. Safe to repeat |
 | `POST /recurring-bookings` | Weekly booking, 1 to 12 weeks, all weeks or none |
 | `GET /staff/utilization?week=&venue_id=` | Booked hours ÷ open hours per court (staff only) |
+| `POST /venues`, `GET /venues` | Create a venue with its rates and peak windows; list venues with courts (staff only) |
+| `PUT /venues/{id}/pricing` | Replace a venue's rates and peak windows (staff only) |
+| `POST /venues/{id}/courts` | Add a court (staff only) |
+| `POST /members` | Create a member and get the id to use as `X-Member-Id` (staff only) |
 
 Errors always look like `{"error": {"code": "...", "message": "..."}}`:
 
@@ -64,7 +115,7 @@ Errors always look like `{"error": {"code": "...", "message": "..."}}`:
 | 401 | `member_required`, `staff_required` |
 | 403 | `forbidden` |
 | 404 | `not_found` |
-| 409 | `slot_unavailable`, `booking_limit_reached`, `invalid_state` |
+| 409 | `slot_unavailable`, `booking_limit_reached`, `invalid_state`, `already_exists` |
 | 410 | `hold_expired` |
 | 422 | `invalid_slot`, `invalid_week` (and standard validation errors) |
 | 503 | `staff_not_configured` |
@@ -144,5 +195,8 @@ LIMITATIONS.md     how the system can still fail
    with tests that attack it concurrently, and each was verified by breaking the code on purpose.
 7. **Reliability of the tests themselves:** a flaky test run was traced to tests sharing the
    development database, and fixed by giving the tests a fresh database each run.
+8. **Administration:** staff endpoints to create venues, courts and members and to change pricing,
+   so the whole system can be set up and used through the API alone. Names are unique in the
+   database, and a pricing update locks the venue so two updates can never be mixed.
 
 See `LIMITATIONS.md` for what this system does not do and how it can still fail.

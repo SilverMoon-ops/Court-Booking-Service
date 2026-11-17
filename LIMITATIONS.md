@@ -19,7 +19,8 @@ What each guarantee does and does not cover is stated precisely.
 - **No real authentication.** Anyone who knows or guesses a member id can act as that member by
   sending `X-Member-Id`. Member ids are random UUIDs, which makes guessing hard, but the header is
   not proof of identity.
-- **Staff access is one shared secret.** Anyone with `STAFF_API_KEY` is staff. There are no
+- **Staff access is one shared secret.** Anyone with `STAFF_API_KEY` is staff, and that now includes
+  creating venues, courts and members and changing prices, not only reading the report. There are no
   individual accounts, no audit trail of who looked at what, and no rotation. The key is sent in a
   header, so it must only be used over HTTPS, which this project does not set up.
 - **No rate limiting or abuse protection.** A client can send requests as fast as the server allows.
@@ -51,13 +52,18 @@ What each guarantee does and does not cover is stated precisely.
 - **The retry check for recurring bookings is a heuristic.** It matches an identical request from
   the same member. It is not an idempotency key, so a member cannot deliberately create two
   identical series while the first is still confirmed.
+- **`sql/schema.sql` is generated, not the source of truth.** The Alembic migrations are. A test
+  fails if the file is stale, and `python -m app.sqlexport` regenerates it. Loading it into a
+  database that already has tables will fail, because it is meant for an empty database.
 - **Price is fixed when the hold is made.** If a venue changes its rates before the member
   confirms, the hold keeps its original price.
 
 ## Product gaps
 
-- **No endpoints to manage venues, courts, members or peak windows.** They are created through
-  `app.seed` or SQL. Real use needs administration endpoints.
+- **Administration is limited.** Staff can create venues, courts and members and change a
+  venue's rates and peak windows. They cannot rename or delete anything, or change a venue's
+  timezone or opening hours, because that would need a decision about the bookings that already
+  exist. Members do not register themselves; staff create them.
 - **Refunds are recorded, not paid.** `refund_amount` says what is owed. Nothing moves money.
 - **Staff cannot cancel or create bookings on a member's behalf.**
 - **A series cannot be cancelled in one call.** Each week is cancelled separately.
