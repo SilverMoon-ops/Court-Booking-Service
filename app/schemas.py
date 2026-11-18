@@ -1,8 +1,18 @@
 import datetime as dt
 import uuid
 from datetime import datetime
+from typing import Annotated
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 
 class HoldRequest(BaseModel):
@@ -101,3 +111,97 @@ class VenueUtilization(BaseModel):
 
 class UtilizationOut(BaseModel):
     venues: list[VenueUtilization]
+
+
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class PeakWindowData(BaseModel):
+    """A weekly peak-price window, in the venue's local time."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    weekday: int = Field(ge=0, le=6, description="Monday = 0 ... Sunday = 6")
+    start_hour: int = Field(ge=0, le=23, description="Inclusive")
+    end_hour: int = Field(ge=1, le=24, description="Exclusive")
+
+    @model_validator(mode="after")
+    def _ends_after_it_starts(self) -> "PeakWindowData":
+        if self.end_hour <= self.start_hour:
+            raise ValueError("end_hour must be after start_hour")
+        return self
+
+
+class PricingIn(BaseModel):
+    offpeak_rate: int = Field(ge=0, description="Per hour, in minor units (paise)")
+    peak_rate: int = Field(ge=0, description="Per hour, in minor units (paise)")
+    peak_windows: list[PeakWindowData] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def _windows_do_not_overlap(self) -> "PricingIn":
+        by_day: dict[int, list[PeakWindowData]] = {}
+        for window in self.peak_windows:
+            by_day.setdefault(window.weekday, []).append(window)
+        for windows in by_day.values():
+            windows.sort(key=lambda w: w.start_hour)
+            for earlier, later in zip(windows, windows[1:], strict=False):
+                if later.start_hour < earlier.end_hour:
+                    raise ValueError("peak windows on the same weekday must not overlap")
+        return self
+
+
+class VenueIn(PricingIn):
+    name: Name
+    timezone: str = Field(description="IANA timezone name, for example Asia/Kolkata")
+    open_hour: int = Field(ge=0, le=23)
+    close_hour: int = Field(ge=1, le=24, description="24 means midnight")
+
+    @field_validator("timezone")
+    @classmethod
+    def _timezone_exists(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ValueError("not a valid IANA timezone, for example Asia/Kolkata") from None
+        return value
+
+    @model_validator(mode="after")
+    def _closes_after_it_opens(self) -> "VenueIn":
+        if self.close_hour <= self.open_hour:
+            raise ValueError("close_hour must be after open_hour")
+        return self
+
+
+class CourtIn(BaseModel):
+    name: Name
+
+
+class MemberIn(BaseModel):
+    name: Name
+
+
+class MemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+
+
+class CourtOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    venue_id: uuid.UUID
+    name: str
+
+
+class VenueOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    timezone: str
+    open_hour: int
+    close_hour: int
+    offpeak_rate: int
+    peak_rate: int
+    peak_windows: list[PeakWindowData]
+    courts: list[CourtOut]

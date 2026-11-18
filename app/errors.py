@@ -53,3 +53,8 @@ class Forbidden(AppError):
 class StaffNotConfigured(AppError):
     status_code = 503
     code = "staff_not_configured"
+
+
+class AlreadyExists(AppError):
+    status_code = 409
+    code = "already_exists"

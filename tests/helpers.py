@@ -90,3 +90,17 @@ def future_recurring_body(
 
 
 STAFF_HEADERS = {"X-Staff-Key": "test-staff-key"}  # tests/__init__.py sets STAFF_API_KEY to this
+
+
+def fire_staff(requests: Sequence[tuple[str, str, dict[str, Any] | None]]) -> list[Response]:
+    """Send every (method, path, body) request, with the staff key, at the same instant."""
+    gate = threading.Barrier(len(requests))
+
+    def call(item: tuple[str, str, dict[str, Any] | None]) -> Response:
+        method, path, body = item
+        client = TestClient(app)
+        gate.wait()
+        return client.request(method, path, json=body, headers=STAFF_HEADERS)
+
+    with ThreadPoolExecutor(max_workers=len(requests)) as pool:
+        return list(pool.map(call, requests))
