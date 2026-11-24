@@ -69,7 +69,8 @@ What each guarantee does and does not cover is stated precisely.
 - **A series cannot be cancelled in one call.** Each week is cancelled separately.
 - **A recurring series counts as one booking.** A member can therefore hold up to 12 weekly
   bookings plus two more. If the club wants a stricter rule, it is one function to change.
-- **No "my bookings" endpoint and no pagination.** The availability endpoint returns one day.
+- **No paging beyond a `limit`.** `GET /bookings` returns up to 500 of a member's bookings, and
+  availability returns one day.
 - **Availability is a snapshot.** A slot shown as free can be taken a moment later. Only the hold
   request decides.
 

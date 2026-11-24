@@ -49,8 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create the environment file
-        run: cp .env.example .env
+      # No .env file: this is exactly what a fresh clone looks like.
       - name: Build and start the whole stack
         run: docker compose up -d --build
       - name: Wait for the API and check it answers

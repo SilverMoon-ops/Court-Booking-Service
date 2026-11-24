@@ -1,7 +1,12 @@
+# `docker compose up --build` works on a fresh clone with no .env file: every setting has a
+# default below. To change a setting, copy .env.example to .env (or export the variable).
 services:
   db:
     image: postgres:15
-    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-club}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-club}
+      POSTGRES_DB: ${POSTGRES_DB:-court_booking}
     ports:
       - "5432:5432"
     volumes:
@@ -14,7 +19,12 @@ services:
 
   api:
     build: .
-    env_file: .env
+    environment:
+      # Built from the database settings above, so the two can never disagree.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-club}:${POSTGRES_PASSWORD:-club}@db:5432/${POSTGRES_DB:-court_booking}
+      HOLD_TTL_MINUTES: ${HOLD_TTL_MINUTES:-10}
+      # Development default. Set a real secret in .env for anything shared.
+      STAFF_API_KEY: ${STAFF_API_KEY:-dev-staff-key}
     depends_on:
       db:
         condition: service_healthy

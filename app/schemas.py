@@ -205,3 +205,17 @@ class VenueOut(BaseModel):
     peak_rate: int
     peak_windows: list[PeakWindowData]
     courts: list[CourtOut]
+
+
+class CourtListItem(BaseModel):
+    """What a member needs to choose a court and then ask for its availability."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    venue_id: uuid.UUID
+    venue_name: str
+    timezone: str
+    open_hour: int
+    close_hour: int

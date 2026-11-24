@@ -6,9 +6,9 @@ is **missing, incomplete or still pending**. Evidence is a test file or a comman
 ## 1. Summary
 
 - All 8 functional requirements, all 3 guarantees and all 4 fixed-contract endpoints are built.
-- 245 automated tests pass. ruff, `ruff format --check` and strict mypy are clean, with **no inline
+- 260 automated tests pass. ruff, `ruff format --check` and strict mypy are clean, with **no inline
   suppressions** anywhere in the code.
-- CI passes on GitHub (run #2): lint, format, strict mypy and all 245 tests on Python 3.11, and
+- CI passes on GitHub (run #2): lint, format, strict mypy and all 260 tests on Python 3.11, and
   `docker compose up` from a clean checkout.
 - Not finished: the live walkthrough, the mid-month requirement change, and several product gaps
   listed in section 4.
@@ -29,6 +29,7 @@ is **missing, incomplete or still pending**. Evidence is a test file or a comman
 | F8 | Staff see court utilization per week | **Done** | `GET /staff/utilization?week=`, booked hours divided by open hours, per court, staff key required | `test_utilization_api.py` (14), `test_week_policies.py` (16) |
 | A1 | Administration (closes gap M1): create venues, courts and members; change pricing | **Done** | Staff-only `POST /venues`, `GET /venues`, `PUT /venues/{id}/pricing`, `POST /venues/{id}/courts`, `POST /members`. Names are unique in the database. A pricing update locks the venue so two updates are never mixed | `test_admin_api.py` (41), `test_admin_concurrency.py` (3) |
 | A2 | The database setup visible as plain SQL | **Done** | `sql/schema.sql` (generated from the migrations), `sql/seed.sql` (idempotent), `sql/inspect.sql`; also `python -m app.seed` and the staff API | `test_sql_files.py` (8): a database built from the SQL matches the migrations, Alembic continues from it, the double-booking rule works on it, the seed never duplicates |
+| A3 | Members can find courts and their own bookings (closes gap M4) | **Done** | `GET /courts` (public) and `GET /bookings` (own bookings and holds, status filter) | `test_member_endpoints_api.py` (15) |
 
 ### Guarantees (must be proven)
 
@@ -56,9 +57,9 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 |---|---|---|
 | Python 3.11 | **Done** | Docker image and CI use 3.11, and CI run #2 passed on it. I develop on 3.12 locally |
 | FastAPI, SQLAlchemy 2, Alembic, Postgres 15 | **Done** | 3 migrations; `postgres:15` in `docker-compose.yml` |
-| pytest | **Done** | 245 tests |
+| pytest | **Done** | 260 tests |
 | ruff and mypy clean, no inline suppressions | **Done** | `ruff check`, `ruff format --check` and strict `mypy` all pass; a search for `noqa`, `type: ignore`, `fmt: skip` finds none |
-| Everything runs with `docker compose up` | **Done** | The CI job `docker compose up` builds and starts the whole stack from a clean checkout and `/health` answers (run #2 passed). Also works on my laptop |
+| Everything runs with `docker compose up` | **Fix ready, verify in CI** | A fresh clone has no `.env` (it is not in git) and the old compose file required one, so `docker compose up` would fail for a reviewer. Compose now has a default for every setting and CI runs it without a `.env`. Done once that CI run is green |
 
 ### Deliverables
 
@@ -67,7 +68,7 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 | DESIGN.md (assumptions, questions for the client, rejected alternatives) | **Done**, updated to match the final system (section 13). Review by the mentor: not confirmed |
 | Own tests proving each guarantee | **Done** |
 | README | **Done** |
-| CI workflow | **Done**: passing on GitHub (run #2: lint, format, types, 245 tests, and `docker compose up`) |
+| CI workflow | **Done**: passing on GitHub (run #2: lint, format, types, 260 tests, and `docker compose up`) |
 | LIMITATIONS.md | **Done** |
 | Live walkthrough where I change something on the spot | **Pending** |
 
@@ -75,7 +76,7 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 
 | Check | Result |
 |---|---|
-| `pytest` (full suite) | 245 passed, 5 runs in a row, all identical |
+| `pytest` (full suite) | 260 passed, 5 runs in a row, all identical |
 | `ruff check .` | passes |
 | `ruff format --check .` | passes |
 | `mypy` (strict) | no issues in 50 files |
@@ -89,13 +90,12 @@ the `X-Member-Id` header; JSON bodies as shown in the README). See open item P1.
 
 ### Missing (not built)
 
-M1 (endpoints to create venues, courts, members and peak windows) was built and moved to section 2 as A1.
+M1 (endpoints to create venues, courts, members and peak windows) and M4 (a "my bookings" list) were built and moved to section 2 as A1 and A3.
 
 | # | Item | Why it matters |
 |---|---|---|
 | M2 | Staff cannot cancel or book on a member's behalf | Open question 8 in the design |
 | M3 | No single call to cancel a whole recurring series | Each week is cancelled separately |
-| M4 | No "my bookings" list | Members cannot see what they hold |
 | M5 | Refunds are recorded, not paid out | There is no payment system |
 | M6 | No real authentication | Identity comes from a header, staff use one shared key |
 

@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -29,3 +30,39 @@ def rules_for_venue(db: Session, venue: Venue) -> VenueRules:
         peak_rate=venue.peak_rate,
         peak_windows=tuple(PeakRule(w.weekday, w.start_hour, w.end_hour) for w in windows),
     )
+
+
+@dataclass(frozen=True)
+class CourtListing:
+    id: uuid.UUID
+    name: str
+    venue_id: uuid.UUID
+    venue_name: str
+    timezone: str
+    open_hour: int
+    close_hour: int
+
+
+def list_courts(db: Session, venue_id: uuid.UUID | None) -> list[CourtListing]:
+    """Every court with its venue, so a member can pick one. Public information only."""
+    if venue_id is not None and db.get(Venue, venue_id) is None:
+        raise NotFound("venue not found")
+    query = (
+        select(Court, Venue)
+        .join(Venue, Court.venue_id == Venue.id)
+        .order_by(Venue.name, Court.name)
+    )
+    if venue_id is not None:
+        query = query.where(Venue.id == venue_id)
+    return [
+        CourtListing(
+            id=court.id,
+            name=court.name,
+            venue_id=venue.id,
+            venue_name=venue.name,
+            timezone=venue.timezone,
+            open_hour=venue.open_hour,
+            close_hour=venue.close_hour,
+        )
+        for court, venue in db.execute(query)
+    ]

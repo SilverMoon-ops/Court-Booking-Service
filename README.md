@@ -9,9 +9,11 @@ impossible by construction, not just unlikely.
 ## Quick start
 
 ```bash
-cp .env.example .env
 docker compose up --build
 ```
+
+No `.env` file is needed: every setting has a default. To change one (for example the staff
+key), copy `.env.example` to `.env` first.
 
 - API: http://localhost:8000 — interactive docs: http://localhost:8000/docs
 - Migrations run automatically when the API container starts.
@@ -97,7 +99,9 @@ curl "localhost:8000/staff/utilization?week=2031-W03" -H "X-Staff-Key: dev-staff
 
 | Endpoint | Purpose |
 |---|---|
+| `GET /courts` | Every court with its venue, so a member can pick one (no login needed) |
 | `GET /courts/{id}/availability?date=` | Hourly slots for a day: free or unavailable, with price |
+| `GET /bookings` | Your own bookings and holds, earliest first; an expired hold shows as `expired` |
 | `POST /holds` | Reserve a slot for 10 minutes. Repeating the same request returns the same hold (`200`) |
 | `POST /holds/{id}/confirm` | Turn a hold into a booking. Safe to repeat |
 | `POST /bookings/{id}/cancel` | Cancel a booking or release a hold. Safe to repeat |

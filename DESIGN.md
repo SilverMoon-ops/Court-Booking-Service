@@ -256,6 +256,12 @@ This section records where the finished system differs from, or adds detail to, 
 - A pricing update locks the venue row and replaces the rates and all peak windows as one unit. Holds and bookings keep the price they were given, because the price is stored when the hold is made.
 - A venue's timezone and opening hours cannot be changed after creation; doing so would need a rule for existing bookings.
 
+**Member-facing reads**
+- `GET /courts` (public) lists every court with its venue, so a member can find a court id to browse. `GET /bookings` (member header) lists the member's own bookings and holds, earliest first, optionally filtered by status. A hold whose time has run out is shown as `expired` even before anything has tidied its row, because every status in the system is worked out from the clock.
+
+**Running it**
+- `docker compose up` needs no `.env` file: every setting has a default, and a `.env` can still override them. CI now runs it without one, which is what a fresh clone looks like.
+
 **The database as SQL**
 - `sql/schema.sql` (generated from the migrations), `sql/seed.sql` (idempotent demo data) and `sql/inspect.sql` (queries for reviewing the data and the rules) let the database setup be read and run with plain `psql`. Tests build a second database from the SQL files alone and check it matches one built by the migrations, that Alembic can continue from it, that the double-booking constraint works on it, and that the seed never duplicates.
 
